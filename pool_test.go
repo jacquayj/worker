@@ -19,9 +19,7 @@ func Test_Worker(t *testing.T) {
 	randIntpool.FinishedJobSubmission()
 
 	randIntpool.Result(func(result int, err error) error {
-
 		log.Print(result)
-
 		return nil
 	})
 }
