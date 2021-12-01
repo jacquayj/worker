@@ -5,6 +5,7 @@ import (
 	"sync"
 )
 
+// Pool is a generic abstraction for a worker pool
 type Pool[R any] struct {
 	jobs      chan JobFunc[R]
 	results   chan jobResult[R]
@@ -21,12 +22,16 @@ type jobResult[R any] struct {
 	err error
 }
 
+// JobFunc is a generic type representing job functions
 type JobFunc[R any] func() (R, error)
 
+// ResultFunc is a generic type representing job result callback functions
 type ResultFunc[R any] func(R, error) error
 
+// ResultBreakFunc is a generic type representing job result callback functions supporting non-error breaks
 type ResultBreakFunc[R any] func(R, error) bool
 
+// NewPool creates a new generic thread pool
 func NewPool[R any](opts ...PoolOpts) *Pool[R] {
 	mergedOpts := mergePoolOpts(opts)
 
@@ -52,6 +57,7 @@ func NewPool[R any](opts ...PoolOpts) *Pool[R] {
 	return pool
 }
 
+// Result invokes the provided callback when results are received, and breaks + returns the callback error if non-nil
 func (p *Pool[R]) Result(callback ResultFunc[R]) error {
 	for result := range p.results {
 		if err := callback(result.res, result.err); err != nil {
@@ -61,6 +67,7 @@ func (p *Pool[R]) Result(callback ResultFunc[R]) error {
 	return nil
 }
 
+// ResultBreak invokes the provided callback when results are received, and breaks subsequent callbacks if the callback return boolean is true
 func (p *Pool[R]) ResultBreak(callback ResultBreakFunc[R]) {
 	for result := range p.results {
 		brek := callback(result.res, result.err)
@@ -70,6 +77,7 @@ func (p *Pool[R]) ResultBreak(callback ResultBreakFunc[R]) {
 	}
 }
 
+// SubmitJob queues the job function for execution
 func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
 	if p.closed {
 		err := fmt.Errorf("unable to submit job, FinishedJobSubmissions() already called")
@@ -103,7 +111,10 @@ func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
 	return nil
 }
 
+// FinishedJobSubmission informs the pool that no more jobs will be submitted. Attempts to submit additional jobs to the pool, after this function is called, will return an error. Will trigger result callback functions to return after job execution completes.
 func (p *Pool[R]) FinishedJobSubmission() {
+	logMsg(*p.opts.LogLevel, Info, "FinishedJobSubmission called")
+
 	p.closed = true
 
 	go func() {
@@ -121,6 +132,8 @@ func (p *Pool[R]) FinishedJobSubmission() {
 
 func (p *Pool[R]) initWorkers() {
 	for i := 0; i < *p.opts.WorkerCount; i++ {
+		workerInx := i
+
 		// Spin up worker goroutine
 		go func() {
 			for job := range p.jobs {
@@ -158,6 +171,8 @@ func (p *Pool[R]) initWorkers() {
 
 				}
 			}
+
+			logMsg(*p.opts.LogLevel, Info, "Worker %v finished", workerInx)
 		}()
 	}
 }

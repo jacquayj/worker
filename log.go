@@ -5,6 +5,7 @@ import (
 	"log"
 )
 
+// LogLevel controls the verbosity of log messages printed in the worker package
 type LogLevel int
 
 const (

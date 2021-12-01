@@ -5,11 +5,22 @@ import (
 	"runtime"
 )
 
+// PoolOpts contains options for use by the worker pool
 type PoolOpts struct {
-	WorkerCount       *int
-	BufferSize        *int
+	// WorkerCount is the desired number of workers to process jobs that are submitted
+	WorkerCount *int
+
+	// BufferSize designates the size of buffered channels used for jobs and results
+	// if BufferSize is nil, non-buffered channels are utilized
+	// this should be set to the maximum number of jobs you expect to be enqueued at any given time
+	BufferSize *int
+
+	// MaxJobGorountines is the max number of simultaneous running gouroutines utilized for non-blocking SubmitJob calls, before an error is returned from SubmitJob
+	// gouroutines are only utilized if BufferSize is nil, or if the buffered channels overflow
 	MaxJobGorountines *int
-	LogLevel          *LogLevel
+
+	// LogLevel designates the logging verbosity of the worker package
+	LogLevel *LogLevel
 }
 
 func (po PoolOpts) String() string {
@@ -55,7 +66,7 @@ func mergePoolOpts(inputOpts []PoolOpts) (opts PoolOpts) {
 		opts.WorkerCount = &defaultWorkerCount
 	}
 
-	defaultMaxJobGoroutines := 512
+	defaultMaxJobGoroutines := 1024
 	if opts.MaxJobGorountines == nil {
 		opts.MaxJobGorountines = &defaultMaxJobGoroutines
 	} else if *opts.MaxJobGorountines < 0 {
