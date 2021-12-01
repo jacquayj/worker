@@ -14,21 +14,25 @@ const (
 	Info
 )
 
+func (ll LogLevel) String() string {
+	switch ll {
+	case Info:
+		return "INFO"
+	case Warning:
+		return "WARNING"
+	case Error:
+		return "ERROR"
+	case None:
+		return "NONE"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 func logMsg(maxLevel, level LogLevel, msg string, vals ...interface{}) {
 	if level > maxLevel {
 		return
 	}
-
 	msg = fmt.Sprintf(msg, vals...)
-
-	switch level {
-	case Info:
-		log.Printf("INFO: %s\n", msg)
-	case Warning:
-		log.Printf("WARNING: %s\n", msg)
-	case Error:
-		log.Printf("ERROR: %s\n", msg)
-	default:
-		log.Println(msg)
-	}
+	log.Printf("%v: %s", level, msg)
 }

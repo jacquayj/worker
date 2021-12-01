@@ -1,12 +1,25 @@
 package worker
 
-import "runtime"
+import (
+	"fmt"
+	"runtime"
+)
 
 type PoolOpts struct {
 	WorkerCount       *int
 	BufferSize        *int
 	MaxJobGorountines *int
 	LogLevel          *LogLevel
+}
+
+func (po PoolOpts) String() string {
+	var bufSize string
+	if po.BufferSize == nil {
+		bufSize = "<nil>"
+	} else {
+		bufSize = fmt.Sprintf("%v", *po.BufferSize)
+	}
+	return fmt.Sprintf("PoolOpts{WorkerCount:%v BufferSize:%v MaxJobGorountines:%v LogLevel:%v}", *po.WorkerCount, bufSize, *po.MaxJobGorountines, *po.LogLevel)
 }
 
 func mergePoolOpts(inputOpts []PoolOpts) (opts PoolOpts) {
@@ -56,7 +69,7 @@ func mergePoolOpts(inputOpts []PoolOpts) (opts PoolOpts) {
 		opts.BufferSize = &defaultBufferSize
 	}
 
-	logMsg(*opts.LogLevel, Info, "configured options: %v", opts)
+	logMsg(*opts.LogLevel, Info, "configured pool options: %v", opts)
 
 	return
 }

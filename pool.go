@@ -23,6 +23,10 @@ type jobResult[R any] struct {
 
 type JobFunc[R any] func() (R, error)
 
+type ResultFunc[R any] func(R, error) error
+
+type ResultBreakFunc[R any] func(R, error) bool
+
 func NewPool[R any](opts ...PoolOpts) *Pool[R] {
 	mergedOpts := mergePoolOpts(opts)
 
@@ -48,13 +52,22 @@ func NewPool[R any](opts ...PoolOpts) *Pool[R] {
 	return pool
 }
 
-func (p *Pool[R]) Result(callback func(R, error) error) error {
+func (p *Pool[R]) Result(callback ResultFunc[R]) error {
 	for result := range p.results {
 		if err := callback(result.res, result.err); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (p *Pool[R]) ResultBreak(callback ResultBreakFunc[R]) {
+	for result := range p.results {
+		brek := callback(result.res, result.err)
+		if brek {
+			break
+		}
+	}
 }
 
 func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
