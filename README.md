@@ -11,26 +11,26 @@ test.go:
 package main
 
 import (
-	"log"
-	"math/rand"
+    "log"
+    "math/rand"
 
-	"github.com/jacquayj/worker"
+    "github.com/jacquayj/worker"
 )
 
 func main() {
-	randIntpool := worker.NewPool[int]()
+    randIntpool := worker.NewPool[int]()
 
-	for i := 0; i < 100; i++ {
-		randIntpool.SubmitJob(func() (int, error) {
-			return rand.Int(), nil
-		})
-	}
-	randIntpool.FinishedJobSubmission()
+    for i := 0; i < 100; i++ {
+        randIntpool.SubmitJob(func() (int, error) {
+            return rand.Int(), nil
+        })
+    }
+    randIntpool.FinishedJobSubmission()
 
-	randIntpool.Result(func(result int, err error) error {
-		log.Print(result)
-		return nil
-	})
+    randIntpool.Result(func(result int, err error) error {
+        log.Print(result)
+        return nil
+    })
 }
 
 ```
@@ -40,7 +40,7 @@ Or begin processing results before all jobs are submitted:
 ```go
 
 func main() {
-	randIntpool := worker.NewPool[int]()
+    randIntpool := worker.NewPool[int]()
 
     go func() {
         for i := 0; i < 100; i++ {
@@ -51,10 +51,10 @@ func main() {
         randIntpool.FinishedJobSubmission()
     }()
 
-	randIntpool.Result(func(result int, err error) error {
-		log.Print(result)
-		return nil
-	})
+    randIntpool.Result(func(result int, err error) error {
+        log.Print(result)
+        return nil
+    })
 }
 ```
 
@@ -63,12 +63,12 @@ Use a struct as the results type:
 ```go
 func main() {
 
-	type RandJobResult struct {
-		Inx int
-		Num int
-	}
+    type RandJobResult struct {
+        Inx int
+        Num int
+    }
 
-	randIntpool := worker.NewPool[RandJobResult]()
+    randIntpool := worker.NewPool[RandJobResult]()
 
     go func() {
         for i := 0; i < 100; i++ {
@@ -80,9 +80,9 @@ func main() {
         randIntpool.FinishedJobSubmission()
     }()
 
-	randIntpool.Result(func(result RandJobResult, err error) error {
-		log.Print(result)
-		return nil
-	})
+    randIntpool.Result(func(result RandJobResult, err error) error {
+        log.Print(result)
+        return nil
+    })
 }
 ```
