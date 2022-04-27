@@ -3,6 +3,7 @@ package worker
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 )
 
 // Pool is a generic abstraction for a worker pool
@@ -14,7 +15,7 @@ type Pool[R any] struct {
 	resultsWg sync.WaitGroup
 	closed    bool
 
-	launchedRoutines int
+	launchedRoutines int32
 }
 
 type jobResult[R any] struct {
@@ -92,19 +93,20 @@ func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
 		p.jobWg.Done()
 	default:
 		// channel is full or blocked, launch new goutine to prevent blocking
+		maxRoutines := int32(*p.opts.MaxJobGorountines)
 
 		// ensure caller doesn't cause goroutine leak
-		if p.launchedRoutines >= *p.opts.MaxJobGorountines {
+		if p.launchedRoutines >= maxRoutines {
 			err := fmt.Errorf("unable to submit job, number of queued goroutines would excede MaxJobGorountines (%d)", *p.opts.MaxJobGorountines)
 			logMsg(*p.opts.LogLevel, Error, err.Error())
 			return err
 		}
 
-		p.launchedRoutines += 1
+		atomic.AddInt32(&p.launchedRoutines, 1)
 		go func() {
 			p.jobs <- job
 			p.jobWg.Done()
-			p.launchedRoutines -= 1
+			atomic.AddInt32(&p.launchedRoutines, -1)
 		}()
 	}
 
@@ -132,10 +134,8 @@ func (p *Pool[R]) FinishedJobSubmission() {
 
 func (p *Pool[R]) initWorkers() {
 	for i := 0; i < *p.opts.WorkerCount; i++ {
-		workerInx := i
-
 		// Spin up worker goroutine
-		go func() {
+		go func(workerInx int) {
 			for job := range p.jobs {
 
 				p.resultsWg.Add(1)
@@ -148,9 +148,10 @@ func (p *Pool[R]) initWorkers() {
 					p.resultsWg.Done()
 				default:
 					// channel is full or blocked, launch new goutine to prevent blocking
+					maxRoutines := int32(*p.opts.MaxJobGorountines)
 
 					// ensure caller doesn't cause goroutine leak
-					if p.launchedRoutines >= *p.opts.MaxJobGorountines {
+					if p.launchedRoutines >= maxRoutines {
 						stallErr := fmt.Sprintf("worker stalled: unable to send job results, number of queued goroutines would excede MaxJobGorountines (%d)", *p.opts.MaxJobGorountines)
 						logMsg(*p.opts.LogLevel, Error, stallErr)
 
@@ -159,13 +160,14 @@ func (p *Pool[R]) initWorkers() {
 						}
 						p.resultsWg.Done()
 					} else {
-						p.launchedRoutines += 1
+						atomic.AddInt32(&p.launchedRoutines, 1)
+
 						go func() {
 							p.results <- jobResult[R]{
 								result, err,
 							}
 							p.resultsWg.Done()
-							p.launchedRoutines -= 1
+							atomic.AddInt32(&p.launchedRoutines, -1)
 						}()
 					}
 
@@ -173,6 +175,6 @@ func (p *Pool[R]) initWorkers() {
 			}
 
 			logMsg(*p.opts.LogLevel, Info, "Worker %v finished", workerInx)
-		}()
+		}(i)
 	}
 }

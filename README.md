@@ -2,8 +2,8 @@
 
 Worker pool using go generics
 
-1. Compile and install go `master` from source https://golang.org/doc/install/source
-2. `/my/go/install/go run -gcflags=-G=3 test.go`
+1. go version >= `1.18` required
+2. `go get github.com/jacquayj/worker`
 
 test.go:
 
