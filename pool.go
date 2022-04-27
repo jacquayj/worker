@@ -99,6 +99,7 @@ func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
 		if p.launchedRoutines >= maxRoutines {
 			err := fmt.Errorf("unable to submit job, number of queued goroutines would excede MaxJobGorountines (%d)", *p.opts.MaxJobGorountines)
 			logMsg(*p.opts.LogLevel, Error, err.Error())
+			p.jobWg.Done()
 			return err
 		}
 
