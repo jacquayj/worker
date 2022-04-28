@@ -15,9 +15,12 @@ type PoolOpts struct {
 	// this should be set to the maximum number of jobs you expect to be enqueued at any given time
 	BufferSize *int
 
-	// MaxJobGorountines is the max number of simultaneous running gouroutines utilized for non-blocking SubmitJob calls, before an error is returned from SubmitJob
+	// MaxJobGorountines is the max number of simultaneous running gouroutines utilized for non-blocking SubmitJob calls, before blocking or an error is returned from SubmitJob
 	// gouroutines are only utilized if BufferSize is nil, or if the buffered channels overflow
 	MaxJobGorountines *int
+
+	// BlockSubmissions specifies whether to block or return an error if MaxJobGorountines is exceeded
+	BlockSubmissions *bool
 
 	// LogLevel designates the logging verbosity of the worker package
 	LogLevel *LogLevel
@@ -47,6 +50,9 @@ func mergePoolOpts(inputOpts []PoolOpts) (opts PoolOpts) {
 		}
 		if o.LogLevel != nil {
 			opts.LogLevel = o.LogLevel
+		}
+		if o.BlockSubmissions != nil {
+			opts.BlockSubmissions = o.BlockSubmissions
 		}
 	}
 
@@ -78,6 +84,11 @@ func mergePoolOpts(inputOpts []PoolOpts) (opts PoolOpts) {
 	if opts.BufferSize != nil && *opts.BufferSize < 0 {
 		logMsg(*opts.LogLevel, Warning, "option BufferSize out of range and non-nil, using default: %v", defaultBufferSize)
 		opts.BufferSize = &defaultBufferSize
+	}
+
+	defaultBlockSubmissions := true
+	if opts.BlockSubmissions == nil {
+		opts.BlockSubmissions = &defaultBlockSubmissions
 	}
 
 	logMsg(*opts.LogLevel, Info, "configured pool options: %v", opts)

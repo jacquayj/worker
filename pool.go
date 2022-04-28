@@ -92,23 +92,32 @@ func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
 	case p.jobs <- job:
 		p.jobWg.Done()
 	default:
-		// channel is full or blocked, launch new goutine to prevent blocking
-		maxRoutines := int32(*p.opts.MaxJobGorountines)
+		// Should we block submissions?
+		if *p.opts.BlockSubmissions {
+			err := fmt.Errorf("submit job blocked temporarily, waiting to submit job")
+			logMsg(*p.opts.LogLevel, Info, err.Error())
 
-		// ensure caller doesn't cause goroutine leak
-		if p.launchedRoutines >= maxRoutines {
-			err := fmt.Errorf("unable to submit job, number of queued goroutines would excede MaxJobGorountines (%d)", *p.opts.MaxJobGorountines)
-			logMsg(*p.opts.LogLevel, Error, err.Error())
-			p.jobWg.Done()
-			return err
-		}
-
-		atomic.AddInt32(&p.launchedRoutines, 1)
-		go func() {
 			p.jobs <- job
 			p.jobWg.Done()
-			atomic.AddInt32(&p.launchedRoutines, -1)
-		}()
+		} else {
+			// channel is full or blocked, launch new goutine to prevent blocking
+			maxRoutines := int32(*p.opts.MaxJobGorountines)
+
+			// ensure caller doesn't cause goroutine leak
+			if p.launchedRoutines >= maxRoutines {
+				err := fmt.Errorf("unable to submit job, number of queued goroutines would excede MaxJobGorountines (%d)", *p.opts.MaxJobGorountines)
+				logMsg(*p.opts.LogLevel, Error, err.Error())
+				p.jobWg.Done()
+				return err
+			}
+
+			atomic.AddInt32(&p.launchedRoutines, 1)
+			go func() {
+				p.jobs <- job
+				p.jobWg.Done()
+				atomic.AddInt32(&p.launchedRoutines, -1)
+			}()
+		}
 	}
 
 	return nil
