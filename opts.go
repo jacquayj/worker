@@ -15,11 +15,11 @@ type PoolOpts struct {
 	// this should be set to the maximum number of jobs you expect to be enqueued at any given time
 	BufferSize *int
 
-	// MaxJobGorountines is the max number of simultaneous running gouroutines utilized for non-blocking SubmitJob calls, before blocking or an error is returned from SubmitJob
+	// MaxJobGoroutines is the max number of simultaneous running gouroutines utilized for non-blocking SubmitJob calls, before blocking or an error is returned from SubmitJob
 	// gouroutines are only utilized if BufferSize is nil, or if the buffered channels overflow
-	MaxJobGorountines *int
+	MaxJobGoroutines *int
 
-	// BlockSubmissions specifies whether to block or return an error if MaxJobGorountines is exceeded
+	// BlockSubmissions specifies whether to block or return an error if MaxJobGoroutines is exceeded
 	BlockSubmissions *bool
 
 	// LogLevel designates the logging verbosity of the worker package
@@ -33,7 +33,7 @@ func (po PoolOpts) String() string {
 	} else {
 		bufSize = fmt.Sprintf("%v", *po.BufferSize)
 	}
-	return fmt.Sprintf("PoolOpts{WorkerCount:%v BufferSize:%v MaxJobGorountines:%v LogLevel:%v}", *po.WorkerCount, bufSize, *po.MaxJobGorountines, *po.LogLevel)
+	return fmt.Sprintf("PoolOpts{WorkerCount:%v BufferSize:%v MaxJobGoroutines:%v LogLevel:%v}", *po.WorkerCount, bufSize, *po.MaxJobGoroutines, *po.LogLevel)
 }
 
 func mergePoolOpts(inputOpts []PoolOpts) (opts PoolOpts) {
@@ -45,8 +45,8 @@ func mergePoolOpts(inputOpts []PoolOpts) (opts PoolOpts) {
 		if o.WorkerCount != nil {
 			opts.WorkerCount = o.WorkerCount
 		}
-		if o.MaxJobGorountines != nil {
-			opts.MaxJobGorountines = o.MaxJobGorountines
+		if o.MaxJobGoroutines != nil {
+			opts.MaxJobGoroutines = o.MaxJobGoroutines
 		}
 		if o.LogLevel != nil {
 			opts.LogLevel = o.LogLevel
@@ -73,11 +73,11 @@ func mergePoolOpts(inputOpts []PoolOpts) (opts PoolOpts) {
 	}
 
 	defaultMaxJobGoroutines := 1024
-	if opts.MaxJobGorountines == nil {
-		opts.MaxJobGorountines = &defaultMaxJobGoroutines
-	} else if *opts.MaxJobGorountines < 0 {
+	if opts.MaxJobGoroutines == nil {
+		opts.MaxJobGoroutines = &defaultMaxJobGoroutines
+	} else if *opts.MaxJobGoroutines < 0 {
 		logMsg(*opts.LogLevel, Warning, "option MaxJobGorountines out of range, using default: %v", defaultMaxJobGoroutines)
-		opts.MaxJobGorountines = &defaultMaxJobGoroutines
+		opts.MaxJobGoroutines = &defaultMaxJobGoroutines
 	}
 
 	defaultBufferSize := 512

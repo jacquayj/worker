@@ -106,7 +106,7 @@ func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
 			p.jobWg.Done()
 		} else {
 			// channel is full or blocked, launch new goutine to prevent blocking
-			maxRoutines := int32(*p.opts.MaxJobGorountines)
+			maxRoutines := int32(*p.opts.MaxJobGoroutines)
 
 			// ensure caller doesn't cause goroutine leak
 			if p.launchedRoutines >= maxRoutines {
@@ -163,11 +163,11 @@ func (p *Pool[R]) initWorkers() {
 					p.resultsWg.Done()
 				default:
 					// channel is full or blocked, launch new goutine to prevent blocking
-					maxRoutines := int32(*p.opts.MaxJobGorountines)
+					maxRoutines := int32(*p.opts.MaxJobGoroutines)
 
 					// ensure caller doesn't cause goroutine leak
 					if atomic.LoadInt32(&p.launchedRoutines) >= maxRoutines {
-						stallErr := fmt.Sprintf("worker stalled: unable to send job results, number of queued goroutines would excede MaxJobGorountines (%d)", *p.opts.MaxJobGorountines)
+						stallErr := fmt.Sprintf("worker stalled: unable to send job results, number of queued goroutines would excede MaxJobGorountines (%d)", *p.opts.MaxJobGoroutines)
 						logMsg(*p.opts.LogLevel, Error, stallErr)
 
 						p.results <- jobResult[R]{
