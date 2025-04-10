@@ -18,10 +18,17 @@ func Test_Worker(t *testing.T) {
 	}
 	randIntpool.FinishedJobSubmission()
 
+	gotResults := 0
 	randIntpool.Result(func(result int, err error) error {
+		gotResults++
 		log.Print(result)
 		return nil
 	})
+
+	// assert gotResults == 100
+	if gotResults != 100 {
+		t.Errorf("Expected 100, got %d", gotResults)
+	}
 }
 
 func Test_Worker_Routine(t *testing.T) {
@@ -36,10 +43,17 @@ func Test_Worker_Routine(t *testing.T) {
 		randIntpool.FinishedJobSubmission()
 	}()
 
+	gotResults := 0
 	randIntpool.Result(func(result int, err error) error {
+		gotResults++
 		log.Print(result)
 		return nil
 	})
+
+	// assert gotResults == 100
+	if gotResults != 100 {
+		t.Errorf("Expected 100, got %d", gotResults)
+	}
 }
 
 func Test_Worker_Struct(t *testing.T) {
@@ -59,10 +73,41 @@ func Test_Worker_Struct(t *testing.T) {
 	}
 	randIntpool.FinishedJobSubmission()
 
+	gotResults := 0
 	randIntpool.Result(func(result RandJobResult, err error) error {
-
+		gotResults++
 		log.Print(result)
 
 		return nil
 	})
+
+	// assert gotResults == 100
+	if gotResults != 100 {
+		t.Errorf("Expected 100, got %d", gotResults)
+	}
+}
+
+func Test_Panic_Single_Job_Race(t *testing.T) {
+	logErr := worker.LogLevel(worker.Error)
+	randIntpool := worker.NewPool[int](worker.PoolOpts{
+		LogLevel: &logErr,
+	})
+
+	// you had one job
+	randIntpool.SubmitJob(func() (int, error) {
+		return rand.Int(), nil
+	})
+	randIntpool.FinishedJobSubmission()
+
+	total := 0
+	randIntpool.Result(func(result int, err error) error {
+		total++
+		return nil
+	})
+	log.Print(total)
+
+	// assert total == 1
+	if total != 1 {
+		t.Errorf("Expected 1, got %d", total)
+	}
 }
