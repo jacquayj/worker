@@ -14,6 +14,7 @@ type Pool[R any] struct {
 	jobWg     sync.WaitGroup
 	resultsWg sync.WaitGroup
 	closed    bool
+	closedMu  sync.Mutex
 
 	launchedRoutines int32
 }
@@ -80,11 +81,14 @@ func (p *Pool[R]) ResultBreak(callback ResultBreakFunc[R]) {
 
 // SubmitJob queues the job function for execution
 func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
+	p.closedMu.Lock()
 	if p.closed {
+		p.closedMu.Unlock()
 		err := fmt.Errorf("unable to submit job, FinishedJobSubmissions() already called")
 		logMsg(*p.opts.LogLevel, Error, err.Error())
 		return err
 	}
+	p.closedMu.Unlock()
 
 	p.jobWg.Add(1)
 
@@ -127,7 +131,9 @@ func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
 func (p *Pool[R]) FinishedJobSubmission() {
 	logMsg(*p.opts.LogLevel, Info, "FinishedJobSubmission called")
 
+	p.closedMu.Lock()
 	p.closed = true
+	p.closedMu.Unlock()
 
 	go func() {
 		// Don't close jobs until all goroutine-queued submissions are sent
