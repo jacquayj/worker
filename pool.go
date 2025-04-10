@@ -90,6 +90,7 @@ func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
 	}
 	p.closedMu.Unlock()
 
+	p.resultsWg.Add(1)
 	p.jobWg.Add(1)
 
 	select {
@@ -153,8 +154,6 @@ func (p *Pool[R]) initWorkers() {
 		// Spin up worker goroutine
 		go func(workerInx int) {
 			for job := range p.jobs {
-
-				p.resultsWg.Add(1)
 
 				// Execute job
 				result, err := job()
