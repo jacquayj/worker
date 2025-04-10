@@ -167,7 +167,7 @@ func (p *Pool[R]) initWorkers() {
 					maxRoutines := int32(*p.opts.MaxJobGorountines)
 
 					// ensure caller doesn't cause goroutine leak
-					if p.launchedRoutines >= maxRoutines {
+					if atomic.LoadInt32(&p.launchedRoutines) >= maxRoutines {
 						stallErr := fmt.Sprintf("worker stalled: unable to send job results, number of queued goroutines would excede MaxJobGorountines (%d)", *p.opts.MaxJobGorountines)
 						logMsg(*p.opts.LogLevel, Error, stallErr)
 
