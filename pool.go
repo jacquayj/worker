@@ -3,7 +3,6 @@ package worker
 import (
 	"fmt"
 	"sync"
-	"sync/atomic"
 )
 
 // Pool is a generic abstraction for a worker pool
@@ -15,8 +14,10 @@ type Pool[R any] struct {
 	resultsWg sync.WaitGroup
 	closed    bool
 	closedMu  sync.Mutex
+	closeOnce sync.Once // Ensures FinishedJobSubmission is called only once
 
-	launchedRoutines int32
+	launchedRoutines   int32
+	launchedRoutinesMu sync.Mutex // Protects launchedRoutines
 }
 
 type jobResult[R any] struct {
@@ -105,22 +106,25 @@ func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
 			p.jobs <- job
 			p.jobWg.Done()
 		} else {
-			// channel is full or blocked, launch new goutine to prevent blocking
-			maxRoutines := int32(*p.opts.MaxJobGoroutines)
-
-			// ensure caller doesn't cause goroutine leak
-			if p.launchedRoutines >= maxRoutines {
-				err := fmt.Errorf("unable to submit job, number of queued goroutines would excede MaxJobGorountines (%d)", *p.opts.MaxJobGorountines)
+			// channel is full or blocked, launch new goroutine to prevent blocking
+			p.launchedRoutinesMu.Lock()
+			if p.launchedRoutines >= int32(*p.opts.MaxJobGoroutines) {
+				p.launchedRoutinesMu.Unlock()
+				err := fmt.Errorf("unable to submit job, number of queued goroutines would exceed MaxJobGoroutines (%d)", *p.opts.MaxJobGoroutines)
 				logMsg(*p.opts.LogLevel, Error, err.Error())
 				p.jobWg.Done()
 				return err
 			}
+			p.launchedRoutines++
+			p.launchedRoutinesMu.Unlock()
 
-			atomic.AddInt32(&p.launchedRoutines, 1)
 			go func() {
 				p.jobs <- job
 				p.jobWg.Done()
-				atomic.AddInt32(&p.launchedRoutines, -1)
+
+				p.launchedRoutinesMu.Lock()
+				p.launchedRoutines--
+				p.launchedRoutinesMu.Unlock()
 			}()
 		}
 	}
@@ -128,25 +132,27 @@ func (p *Pool[R]) SubmitJob(job JobFunc[R]) error {
 	return nil
 }
 
-// FinishedJobSubmission informs the pool that no more jobs will be submitted. Attempts to submit additional jobs to the pool, after this function is called, will return an error. Will trigger result callback functions to return after job execution completes.
+// FinishedJobSubmission informs the pool that no more jobs will be submitted.
 func (p *Pool[R]) FinishedJobSubmission() {
-	logMsg(*p.opts.LogLevel, Info, "FinishedJobSubmission called")
+	p.closeOnce.Do(func() { // Ensures this block runs only once
+		logMsg(*p.opts.LogLevel, Info, "FinishedJobSubmission called")
 
-	p.closedMu.Lock()
-	p.closed = true
-	p.closedMu.Unlock()
+		p.closedMu.Lock()
+		p.closed = true
+		p.closedMu.Unlock()
 
-	go func() {
-		// Don't close jobs until all goroutine-queued submissions are sent
-		p.jobWg.Wait()
-		close(p.jobs)
-	}()
+		go func() {
+			// Don't close jobs until all goroutine-queued submissions are sent
+			p.jobWg.Wait()
+			close(p.jobs)
+		}()
 
-	go func() {
-		// Don't close results until all goroutine-queued results are sent
-		p.resultsWg.Wait()
-		close(p.results)
-	}()
+		go func() {
+			// Don't close results until all goroutine-queued results are sent
+			p.resultsWg.Wait()
+			close(p.results)
+		}()
+	})
 }
 
 func (p *Pool[R]) initWorkers() {
@@ -166,8 +172,10 @@ func (p *Pool[R]) initWorkers() {
 					maxRoutines := int32(*p.opts.MaxJobGoroutines)
 
 					// ensure caller doesn't cause goroutine leak
-					if atomic.LoadInt32(&p.launchedRoutines) >= maxRoutines {
-						stallErr := fmt.Sprintf("worker stalled: unable to send job results, number of queued goroutines would excede MaxJobGorountines (%d)", *p.opts.MaxJobGoroutines)
+					p.launchedRoutinesMu.Lock()
+					if p.launchedRoutines >= maxRoutines {
+						p.launchedRoutinesMu.Unlock()
+						stallErr := fmt.Sprintf("worker stalled: unable to send job results, number of queued goroutines would exceed MaxJobGoroutines (%d)", *p.opts.MaxJobGoroutines)
 						logMsg(*p.opts.LogLevel, Error, stallErr)
 
 						p.results <- jobResult[R]{
@@ -175,14 +183,18 @@ func (p *Pool[R]) initWorkers() {
 						}
 						p.resultsWg.Done()
 					} else {
-						atomic.AddInt32(&p.launchedRoutines, 1)
+						p.launchedRoutines++
+						p.launchedRoutinesMu.Unlock()
 
 						go func() {
 							p.results <- jobResult[R]{
 								result, err,
 							}
 							p.resultsWg.Done()
-							atomic.AddInt32(&p.launchedRoutines, -1)
+
+							p.launchedRoutinesMu.Lock()
+							p.launchedRoutines--
+							p.launchedRoutinesMu.Unlock()
 						}()
 					}
 
